@@ -8,12 +8,11 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#080d1a">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Devanagari:wght@400;700&display=swap" rel="stylesheet">
-  
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -21,229 +20,175 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
-    :root {
-      --bg: #080d1a;
-      --card-bg: #111827;
-      --accent: #6366f1;
-      --glass: rgba(255, 255, 255, 0.03);
-      --glass-border: rgba(255, 255, 255, 0.1);
-    }
-
-    body {
-      font-family: 'Space Grotesk', sans-serif;
-      background-color: var(--bg);
-      color: #e2e8f0;
-      overflow-x: hidden;
-      -webkit-tap-highlight-color: transparent;
-    }
-
+    :root { --bg: #080d1a; --accent: #6366f1; }
+    body { font-family: 'Space Grotesk', sans-serif; background-color: var(--bg); color: #e2e8f0; -webkit-tap-highlight-color: transparent; }
     .hindi-text { font-family: 'Noto Sans Devanagari', sans-serif; }
-    .math-text { font-family: 'JetBrains Mono', monospace; }
-
-    /* Card Flip Engine */
-    .card-container { perspective: 2000px; width: 100%; max-width: 400px; height: 500px; }
-    .card-inner {
-      position: relative; width: 100%; height: 100%;
-      transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
-      transform-style: preserve-3d;
-    }
+    .card-container { perspective: 1500px; height: 420px; width: 100%; max-width: 420px; margin: 0 auto; }
+    .card-inner { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; position: relative; height: 100%; width: 100%; cursor: pointer; }
     .is-flipped { transform: rotateY(180deg); }
-    .card-face {
-      position: absolute; inset: 0; backface-visibility: hidden;
-      border-radius: 28px; padding: 2.5rem;
-      display: flex; flex-direction: column;
-      border: 1px solid var(--glass-border);
-      background: linear-gradient(165deg, #111827 0%, #080d1a 100%);
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
-    }
-    .card-back { transform: rotateY(180deg); background: linear-gradient(165deg, #0f172a 0%, #020617 100%); }
-
-    /* Glossy UI Elements */
-    .btn-action {
-      background: var(--glass);
-      border: 1px solid var(--glass-border);
-      backdrop-filter: blur(12px);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .btn-action:active { transform: scale(0.95); }
-    
-    .score-badge {
-      background: linear-gradient(to bottom, rgba(99, 102, 241, 0.2), transparent);
-      border: 1px solid rgba(99, 102, 241, 0.2);
-    }
-
-    .glow-point {
-      position: fixed; width: 40vw; height: 40vw; border-radius: 50%;
-      background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
-      filter: blur(60px); z-index: -1; pointer-events: none;
-    }
+    .card-face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 24px; padding: 32px; display: flex; flex-direction: column; border: 1px solid rgba(255, 255, 255, 0.08); background: linear-gradient(145deg, #111827, #080d1a); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+    .card-back { transform: rotateY(180deg); }
+    .btn-glass { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); transition: all 0.2s ease; }
+    .btn-glass:active { transform: scale(0.95); }
   </style>
 </head>
 <body>
-  <div class="glow-point" style="top: -10%; left: -10%;"></div>
-  <div class="glow-point" style="bottom: -10%; right: -10%;"></div>
   <div id="root"></div>
 
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
-    // --- Components ---
-
     const SubjectIcon = ({ subject }) => {
-      const s = (subject || "").toLowerCase();
-      const icons = {
-        hindi: <span className="text-3xl font-bold hindi-text text-amber-500">अ</span>,
-        maths: <i data-lucide="calculator" className="w-7 h-7 text-indigo-400"></i>,
-        science: <i data-lucide="flask-conical" className="w-7 h-7 text-emerald-400"></i>,
-        english: <i data-lucide="book-open" className="w-7 h-7 text-sky-400"></i>,
-        computer: <i data-lucide="cpu" className="w-7 h-7 text-cyan-400"></i>
+      const s = (subject || "science").toLowerCase();
+      const map = {
+        hindi: <span className="text-2xl font-bold hindi-text text-amber-500">अ</span>,
+        maths: <i data-lucide="calculator" className="w-6 h-6 text-indigo-400"></i>,
+        science: <i data-lucide="flask-conical" className="w-6 h-6 text-emerald-400"></i>,
+        english: <i data-lucide="languages" className="w-6 h-6 text-sky-400"></i>,
+        computer: <i data-lucide="cpu" className="w-6 h-6 text-cyan-400"></i>
       };
-      return <div className="p-3 rounded-2xl bg-white/5 border border-white/10 shadow-xl">{icons[s] || <i data-lucide="help-circle" className="text-slate-500"></i>}</div>;
+      return <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">{map[s] || map.science}</div>;
     };
 
-    const ContentBox = ({ content, isAnswer }) => {
+    const MathText = ({ content }) => {
       const ref = useRef(null);
       useEffect(() => {
         if (!ref.current) return;
         const parts = content.split(/(\$[^$]+\$)/g);
         ref.current.innerHTML = "";
         parts.forEach(p => {
+          const span = document.createElement("span");
           if (p.startsWith("$") && p.endsWith("$")) {
-            const span = document.createElement("span");
-            span.className = "math-text mx-1";
             try { katex.render(p.slice(1, -1), span, { throwOnError: false }); } catch(e) { span.innerText = p; }
-            ref.current.appendChild(span);
           } else {
-            const span = document.createElement("span");
             if (/[\u0900-\u097F]/.test(p)) span.className = "hindi-text";
             span.innerText = p;
-            ref.current.appendChild(span);
           }
+          ref.current.appendChild(span);
         });
-        lucide.createIcons();
       }, [content]);
-      return <div ref={ref} className={`text-center text-xl sm:text-2xl font-medium tracking-tight leading-relaxed ${isAnswer ? 'text-indigo-100' : 'text-white'}`}></div>;
+      return <div ref={ref} className="text-xl font-medium text-center"></div>;
     };
-
-    // --- App Engine ---
 
     function App() {
       const [cards, setCards] = useState([]);
-      const [index, setIndex] = useState(0);
+      const [currentIndex, setCurrentIndex] = useState(0);
       const [score, setScore] = useState(0);
-      const [view, setView] = useState('upload'); // upload, study, summary
-      const [isFlipped, setIsFlipped] = useState(false);
-      const [raw, setRaw] = useState("");
+      const [mode, setMode] = useState('upload'); // upload, study, finish
+      const [flipped, setFlipped] = useState(false);
+      const [isShuffle, setIsShuffle] = useState(false);
+      const [rawInput, setRawInput] = useState("");
 
       useEffect(() => {
         const saved = localStorage.getItem("ronin_flash_pro");
-        if (saved) { setCards(JSON.parse(saved)); setView('study'); }
+        if (saved) { setCards(JSON.parse(saved)); setMode('study'); }
         lucide.createIcons();
       }, []);
 
-      const handleUpload = () => {
-        const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
-        const deck = [];
+      const shuffle = (array) => [...array].sort(() => Math.random() - 0.5);
+
+      const processDeck = () => {
+        const lines = rawInput.split("\n").map(l => l.trim()).filter(Boolean);
+        const newDeck = [];
         for (let i = 0; i < lines.length; i += 2) {
           if (!lines[i+1]) continue;
           let q = lines[i].replace(/^Q:\s*/i, "");
           let a = lines[i+1].replace(/^A:\s*/i, "");
           const d = (q.match(/\[(Easy|Medium|Difficult)\]/i) || ["", "Medium"])[1];
-          const s = (q.match(/\[Icon:\s*(.*?)\]/i) || ["", "science"])[1].toLowerCase();
-          deck.push({ q: q.replace(/\[.*?\]/g, "").trim(), a, d, s });
+          const s = (q.match(/\[Icon:\s*(.*?)\]/i) || ["", "science"])[1];
+          newDeck.push({ q: q.replace(/\[.*?\]/g, "").trim(), a, d, s });
         }
-        if (deck.length) {
-          localStorage.setItem("ronin_flash_pro", JSON.stringify(deck));
-          setCards(deck); setView('study');
-        }
+        const finalDeck = isShuffle ? shuffle(newDeck) : newDeck;
+        setCards(finalDeck);
+        localStorage.setItem("ronin_flash_pro", JSON.stringify(finalDeck));
+        setMode('study');
       };
 
-      const handleNext = (correct) => {
-        if (correct) setScore(s => s + 2);
-        if (index < cards.length - 1) {
-          setIsFlipped(false);
-          setTimeout(() => setIndex(i => i + 1), 300);
-        } else { setView('summary'); }
+      const handleReset = () => {
+        localStorage.removeItem("ronin_flash_pro");
+        setCards([]);
+        setCurrentIndex(0);
+        setScore(0);
+        setMode('upload');
       };
 
-      if (view === 'upload') return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-8 max-w-2xl mx-auto">
-          <div className="mb-8 p-5 rounded-3xl bg-indigo-600 shadow-2xl shadow-indigo-500/20"><i data-lucide="layers" className="w-10 h-10"></i></div>
-          <h1 className="text-4xl font-bold mb-2 tracking-tighter">Flashcard Studio</h1>
-          <p className="text-slate-500 mb-10 text-center font-medium">Paste up to 100 questions using Q: and A: format</p>
-          <textarea className="w-full h-80 p-5 bg-[#0d1424] border border-white/5 rounded-3xl text-sm font-mono mb-8 focus:border-indigo-500 outline-none" 
-            placeholder="Q: Capital of Singapore? [Easy] [Icon: English]&#10;A: Singapore City"
-            value={raw} onChange={e => setRaw(e.target.value)} />
-          <button onClick={handleUpload} className="w-full py-4 bg-indigo-600 rounded-2xl font-bold text-lg hover:bg-indigo-500 active:scale-95 transition-all">Generate Deck</button>
+      if (mode === 'upload') return (
+        <div className="max-w-xl mx-auto min-h-screen flex flex-col items-center justify-center p-6">
+          <h1 className="text-3xl font-bold mb-6 text-indigo-400">Flashcard Studio</h1>
+          <div className="w-full flex justify-between mb-4 px-2">
+             <span className="text-sm text-slate-500 font-medium uppercase tracking-widest">Bulk Content (.md)</span>
+             <button onClick={() => setIsShuffle(!isShuffle)} className={`text-xs font-bold px-3 py-1 rounded-full border transition ${isShuffle ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-slate-700 text-slate-500'}`}>
+                {isShuffle ? 'SHUFFLE ON' : 'SEQUENTIAL'}
+             </button>
+          </div>
+          <textarea className="w-full h-80 p-5 bg-[#0d1424] border border-white/5 rounded-2xl text-sm font-mono mb-6 focus:border-indigo-500 outline-none" 
+            placeholder="Paste your 100 questions here...&#10;Q: Question [Easy] [Icon: Hindi]&#10;A: Answer"
+            value={rawInput} onChange={e => setRawInput(e.target.value)} />
+          <button onClick={processDeck} className="w-full bg-indigo-600 py-4 rounded-2xl font-bold text-lg shadow-xl active:scale-95 transition">Start Learning</button>
         </div>
       );
 
-      if (view === 'summary') return (
-        <div className="flex flex-col items-center justify-center min-h-screen text-center p-8">
-          <div className="text-7xl mb-8">🎯</div>
-          <h1 className="text-6xl font-bold mb-4">{score} / {cards.length * 2}</h1>
-          <p className="text-slate-400 text-xl mb-12">Great session! All cards cleared.</p>
-          <button onClick={() => { localStorage.clear(); location.reload(); }} className="px-10 py-5 btn-action rounded-2xl font-bold flex items-center gap-3">
-            <i data-lucide="refresh-cw" className="w-5 h-5"></i> Restart Studio
-          </button>
+      if (mode === 'finish') return (
+        <div className="flex flex-col items-center justify-center min-h-screen text-center p-6">
+          <div className="text-6xl mb-6">🏆</div>
+          <h1 className="text-5xl font-bold mb-2 tracking-tighter">{score} Points</h1>
+          <p className="text-slate-400 mb-12 uppercase text-xs tracking-[0.3em]">Session Complete</p>
+          <button onClick={handleReset} className="px-10 py-4 btn-glass rounded-2xl font-bold text-indigo-400">New Session</button>
         </div>
       );
 
-      const card = cards[index];
-      const dColor = { Easy: 'border-emerald-500/50', Medium: 'border-amber-500/50', Difficult: 'border-rose-500/50' }[card.d];
+      const card = cards[currentIndex];
+      const borderColor = { Easy: 'border-emerald-500', Medium: 'border-amber-500', Difficult: 'border-rose-500' }[card.d];
 
       return (
-        <div className="max-w-lg mx-auto min-h-screen flex flex-col p-6 pt-12">
-          <header className="flex justify-between items-center mb-16">
-            <div className="score-badge px-4 py-2 rounded-xl">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Total Score</p>
+        <div className="max-w-lg mx-auto min-h-screen flex flex-col p-6">
+          <header className="flex justify-between items-start mb-12 pt-6">
+            <div>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total Score</p>
               <p className="text-3xl font-bold text-indigo-400 tabular-nums">{score}</p>
             </div>
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Card Index</p>
-              <p className="text-xl font-bold">{index + 1} <span className="text-slate-700">/ {cards.length}</span></p>
-            </div>
+            <button onClick={handleReset} className="p-2 btn-glass rounded-xl text-slate-500 hover:text-rose-400 transition">
+              <i data-lucide="rotate-ccw" className="w-5 h-5"></i>
+            </button>
           </header>
 
-          <div className="flex-1 flex flex-col items-center justify-center gap-12">
-            <div className="card-container" onClick={() => setIsFlipped(!isFlipped)}>
-              <div className={`card-inner ${isFlipped ? 'is-flipped' : ''}`}>
-                <div className={`card-face card-front border-t-8 ${dColor}`}>
-                  <div className="flex justify-between items-start mb-10">
-                    <span className="px-3 py-1 bg-white/5 border border-white/5 rounded-full text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Question</span>
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="card-container" onClick={() => setFlipped(!flipped)}>
+              <div className={`card-inner ${flipped ? 'is-flipped' : ''}`}>
+                <div className={`card-face card-front border-t-8 ${borderColor}`}>
+                  <div className="flex justify-between items-center mb-6">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Question {currentIndex + 1}/{cards.length}</span>
                     <SubjectIcon subject={card.s} />
                   </div>
-                  <ContentBox content={card.q} isAnswer={false} />
-                  <p className="text-center text-[10px] text-slate-600 font-bold uppercase tracking-[0.3em] mt-auto animate-pulse">Tap Card to Flip</p>
+                  <div className="flex-1 flex items-center justify-center">
+                    <MathText content={card.q} />
+                  </div>
+                  <p className="text-center text-[10px] text-slate-600 font-bold uppercase tracking-widest animate-pulse mt-4">Tap to reveal</p>
                 </div>
-                <div className={`card-face card-back border-t-8 border-indigo-500`}>
-                  <div className="flex justify-between items-start mb-10">
-                    <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-tighter">Correct Answer</span>
+                <div className="card-face card-back border-t-8 border-indigo-500">
+                  <div className="flex justify-between items-center mb-6">
+                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Answer</span>
                     <SubjectIcon subject={card.s} />
                   </div>
-                  <ContentBox content={card.a} isAnswer={true} />
+                  <div className="flex-1 flex items-center justify-center">
+                    <MathText content={card.a} />
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className={`flex gap-4 w-full transition-all duration-500 ${isFlipped ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-              <button onClick={(e) => { e.stopPropagation(); handleNext(false); }} className="flex-1 py-5 btn-action border-rose-500/20 text-rose-500 rounded-3xl font-bold">Incorrect</button>
-              <button onClick={(e) => { e.stopPropagation(); handleNext(true); }} className="flex-1 py-5 bg-indigo-600 rounded-3xl font-bold text-white shadow-xl shadow-indigo-500/20">Correct +2</button>
+            <div className={`mt-10 flex gap-4 w-full transition-all duration-300 ${flipped ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <button onClick={() => { setFlipped(false); setTimeout(() => currentIndex < cards.length - 1 ? setCurrentIndex(currentIndex + 1) : setMode('finish'), 300); }} 
+                className="flex-1 py-4 btn-glass text-slate-400 rounded-2xl font-bold">Incorrect</button>
+              <button onClick={() => { setScore(score + 2); setFlipped(false); setTimeout(() => currentIndex < cards.length - 1 ? setCurrentIndex(currentIndex + 1) : setMode('finish'), 300); }} 
+                className="flex-1 py-4 bg-indigo-600 rounded-2xl font-bold shadow-lg shadow-indigo-500/20">Correct +2</button>
             </div>
           </div>
         </div>
       );
     }
-
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
-
-    // Service Worker Registration
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js').catch(() => {});
-      });
-    }
   </script>
 </body>
 </html>
