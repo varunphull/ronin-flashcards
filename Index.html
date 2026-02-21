@@ -1,0 +1,260 @@
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ronin Flashcard Studio</title>
+
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#080d1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Devanagari:wght@400;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    :root {
+      --bg: #080d1a;
+      --card-bg: #111827;
+      --accent: #6366f1;
+      --easy: #10b981;
+      --medium: #f59e0b;
+      --difficult: #ef4444;
+    }
+
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background-color: var(--bg);
+      color: #e2e8f0;
+      -webkit-tap-highlight-color: transparent;
+      overflow-x: hidden;
+    }
+
+    .hindi-text { font-family: 'Noto Sans Devanagari', sans-serif; }
+    .math-text { font-family: 'JetBrains Mono', monospace; }
+
+    /* Card Flip Animation */
+    .card-container { perspective: 1500px; }
+    .card-inner {
+      transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+      transform-style: preserve-3d;
+      position: relative;
+      height: 400px;
+    }
+    .is-flipped { transform: rotateY(180deg); }
+    .card-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      border-radius: 24px;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(145deg, #111827, #080d1a);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+    .card-back { transform: rotateY(180deg); }
+
+    /* Glow Effects from the Maths Tool */
+    .glow-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.05) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* Glassmorphism Buttons */
+    .btn-glass {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+    }
+    .btn-glass:hover { background: rgba(255, 255, 255, 0.08); }
+    
+    textarea::placeholder { color: #4b5563; }
+  </style>
+</head>
+<body>
+  <div class="glow-overlay"></div>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // --- ICON MAPPING ---
+    const SubjectIcon = ({ subject }) => {
+      const iconRef = useRef(null);
+      useEffect(() => { lucide.createIcons(); }, [subject]);
+
+      const map = {
+        hindi: <span className="text-2xl font-bold hindi-text text-amber-500">अ</span>,
+        maths: <i data-lucide="calculator" className="w-6 h-6 text-indigo-400"></i>,
+        science: <i data-lucide="flask-conical" className="w-6 h-6 text-emerald-400"></i>,
+        english: <i data-lucide="languages" className="w-6 h-6 text-sky-400"></i>,
+        computer: <i data-lucide="cpu" className="w-6 h-6 text-cyan-400"></i>
+      };
+
+      return <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 shadow-inner">
+        {map[subject.toLowerCase()] || <i data-lucide="book" className="w-6 h-6 text-slate-400"></i>}
+      </div>;
+    };
+
+    // --- MATH RENDERER ---
+    const MathRenderer = ({ content, className }) => {
+      const ref = useRef(null);
+      useEffect(() => {
+        if (!ref.current || !content) return;
+        const parts = content.split(/(\$[^$]+\$)/g);
+        ref.current.innerHTML = "";
+        parts.forEach(part => {
+          if (part.startsWith("$") && part.endsWith("$")) {
+            const span = document.createElement("span");
+            try { katex.render(part.slice(1, -1), span, { throwOnError: false }); } catch(e) { span.innerText = part; }
+            ref.current.appendChild(span);
+          } else {
+            const span = document.createElement("span");
+            if (/[\u0900-\u097F]/.test(part)) span.className = "hindi-text";
+            span.innerText = part;
+            ref.current.appendChild(span);
+          }
+        });
+      }, [content]);
+      return <div ref={ref} className={`${className} leading-relaxed`}></div>;
+    };
+
+    function App() {
+      const [cards, setCards] = useState([]);
+      const [index, setIndex] = useState(0);
+      const [score, setScore] = useState(0);
+      const [mode, setMode] = useState('upload'); // upload, study, finish
+      const [flipped, setFlipped] = useState(false);
+      const [raw, setRaw] = useState("");
+
+      useEffect(() => {
+        const saved = localStorage.getItem("ronin_flashcards_pro");
+        if (saved) { setCards(JSON.parse(saved)); setMode('study'); }
+        lucide.createIcons();
+      }, []);
+
+      const process = () => {
+        const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
+        const deck = [];
+        for (let i = 0; i < lines.length; i += 2) {
+          if (!lines[i+1]) continue;
+          let q = lines[i].replace(/^Q:\s*/i, "");
+          let a = lines[i+1].replace(/^A:\s*/i, "");
+          const dMatch = q.match(/\[(Easy|Medium|Difficult)\]/i);
+          const d = dMatch ? dMatch[1] : 'Medium';
+          const iMatch = q.match(/\[Icon:\s*(.*?)\]/i);
+          const s = iMatch ? iMatch[1] : 'science';
+          deck.push({ q: q.replace(/\[.*?\]/g, "").trim(), a, d, s });
+        }
+        if (deck.length) {
+          localStorage.setItem("ronin_flashcards_pro", JSON.stringify(deck));
+          setCards(deck); setMode('study');
+        }
+      };
+
+      const handleScore = (win) => {
+        if (win) setScore(s => s + 2);
+        if (index < cards.length - 1) {
+          setFlipped(false);
+          setTimeout(() => setIndex(i => i + 1), 300);
+        } else { setMode('finish'); }
+      };
+
+      if (mode === 'upload') return (
+        <div className="max-w-2xl mx-auto min-h-screen flex flex-col items-center justify-center p-6 animate-in fade-in duration-700">
+          <div className="w-16 h-16 bg-indigo-600 rounded-2xl mb-6 flex items-center justify-center shadow-2xl shadow-indigo-500/20">
+            <i data-lucide="zap" className="w-8 h-8 text-white"></i>
+          </div>
+          <h1 className="text-3xl font-bold mb-2 tracking-tight">Flashcard Studio</h1>
+          <p className="text-slate-500 mb-8 font-medium">Bulk upload your MD content below</p>
+          <textarea className="w-full h-80 p-5 bg-[#0d1424] border border-white/5 rounded-2xl text-sm font-mono mb-6 focus:border-indigo-500/50 outline-none shadow-inner"
+            placeholder="Q: What is $E = mc^2$? [Difficult] [Icon: Science]&#10;A: Mass-energy equivalence"
+            value={raw} onChange={e => setRaw(e.target.value)} />
+          <button onClick={process} className="w-full bg-indigo-600 py-4 rounded-2xl font-bold text-lg hover:bg-indigo-500 transition-all active:scale-[0.98]">
+            Process Deck
+          </button>
+        </div>
+      );
+
+      if (mode === 'finish') return (
+        <div className="flex flex-col items-center justify-center min-h-screen text-center p-6">
+          <div className="text-6xl mb-6">🎯</div>
+          <h1 className="text-5xl font-bold mb-4">{score} / {cards.length * 2}</h1>
+          <p className="text-slate-400 mb-12 text-lg">Deck complete. Excellent work!</p>
+          <button onClick={() => { localStorage.clear(); location.reload(); }} className="px-10 py-4 btn-glass rounded-2xl font-bold flex items-center gap-2">
+            <i data-lucide="rotate-ccw" className="w-5 h-5"></i> Reset Session
+          </button>
+        </div>
+      );
+
+      const card = cards[index];
+      const dColor = { Easy: 'border-emerald-500', Medium: 'border-amber-500', Difficult: 'border-rose-500' }[card.d];
+
+      return (
+        <div className="max-w-lg mx-auto min-h-screen flex flex-col p-6 pt-12">
+          <header className="flex justify-between items-center mb-12">
+            <div>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total Marks</p>
+              <p className="text-4xl font-bold text-indigo-400 tabular-nums">{score}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Progress</p>
+              <p className="text-xl font-bold">{index + 1} <span className="text-slate-600 font-medium">/ {cards.length}</span></p>
+            </div>
+          </header>
+
+          <div className="flex-1 flex flex-col justify-center">
+            <div className="card-container w-full" onClick={() => setFlipped(!flipped)}>
+              <div className={`card-inner ${flipped ? 'is-flipped' : ''}`}>
+                <div className={`card-face card-front border-t-4 ${dColor}`}>
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-tighter">Question</span>
+                    <SubjectIcon subject={card.s} />
+                  </div>
+                  <MathRenderer content={card.q} className="text-2xl font-medium text-center my-auto" />
+                  <div className="mt-6 flex items-center justify-center gap-2 text-slate-600 text-[10px] font-bold uppercase tracking-widest animate-pulse">
+                    <i data-lucide="mouse-pointer-2" className="w-3 h-3"></i> Tap to flip
+                  </div>
+                </div>
+                <div className="card-face card-back border-t-4 border-indigo-500">
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-tighter">Answer</span>
+                    <SubjectIcon subject={card.s} />
+                  </div>
+                  <MathRenderer content={card.a} className="text-2xl font-medium text-center my-auto" />
+                </div>
+              </div>
+            </div>
+
+            <div className={`mt-10 flex gap-4 transition-all duration-500 ${flipped ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <button onClick={(e) => { e.stopPropagation(); handleScore(false); }} className="flex-1 py-4 btn-glass border-rose-500/20 text-rose-500 rounded-2xl font-bold">Incorrect</button>
+              <button onClick={(e) => { e.stopPropagation(); handleScore(true); }} className="flex-1 py-4 btn-glass border-emerald-500/20 text-emerald-500 rounded-2xl font-bold">Correct +2</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

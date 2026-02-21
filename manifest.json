@@ -1,0 +1,47 @@
+{
+  "name": "Ronin's Maths Interactive Tool",
+  "short_name": "MathsTool",
+  "description": "Cambridge IGCSE Year 7/8 interactive maths explorer — geometry, algebra, statistics and probability.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#080d1a",
+  "theme_color": "#6366f1",
+  "lang": "en-GB",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Geometry",
+      "short_name": "Geometry",
+      "description": "Open Geometry topics",
+      "url": "./index.html?cat=geometry"
+    },
+    {
+      "name": "Algebra",
+      "short_name": "Algebra",
+      "description": "Open Algebra topics",
+      "url": "./index.html?cat=algebra"
+    },
+    {
+      "name": "Statistics",
+      "short_name": "Stats",
+      "description": "Open Statistics topics",
+      "url": "./index.html?cat=stats"
+    }
+  ]
+}
