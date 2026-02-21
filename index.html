@@ -29,7 +29,8 @@
     .card-face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 24px; padding: 32px; display: flex; flex-direction: column; border: 1px solid rgba(255, 255, 255, 0.08); background: linear-gradient(145deg, #111827, #080d1a); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
     .card-back { transform: rotateY(180deg); }
     .btn-glass { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); transition: all 0.2s ease; }
-    .btn-glass:active { transform: scale(0.95); }
+    .drop-zone { border: 2px dashed rgba(99, 102, 241, 0.3); transition: all 0.3s ease; }
+    .drop-zone:hover { border-color: #6366f1; background: rgba(99, 102, 241, 0.05); }
   </style>
 </head>
 <body>
@@ -38,6 +39,7 @@
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
+    // --- Components ---
     const SubjectIcon = ({ subject }) => {
       const s = (subject || "science").toLowerCase();
       const map = {
@@ -74,10 +76,11 @@
       const [cards, setCards] = useState([]);
       const [currentIndex, setCurrentIndex] = useState(0);
       const [score, setScore] = useState(0);
-      const [mode, setMode] = useState('upload'); // upload, study, finish
+      const [mode, setMode] = useState('upload');
       const [flipped, setFlipped] = useState(false);
       const [isShuffle, setIsShuffle] = useState(false);
       const [rawInput, setRawInput] = useState("");
+      const fileInputRef = useRef(null);
 
       useEffect(() => {
         const saved = localStorage.getItem("ronin_flash_pro");
@@ -87,8 +90,8 @@
 
       const shuffle = (array) => [...array].sort(() => Math.random() - 0.5);
 
-      const processDeck = () => {
-        const lines = rawInput.split("\n").map(l => l.trim()).filter(Boolean);
+      const parseAndStart = (text) => {
+        const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
         const newDeck = [];
         for (let i = 0; i < lines.length; i += 2) {
           if (!lines[i+1]) continue;
@@ -104,27 +107,51 @@
         setMode('study');
       };
 
+      const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setRawInput(e.target.result);
+          parseAndStart(e.target.result);
+        };
+        reader.readAsText(file);
+      };
+
       const handleReset = () => {
         localStorage.removeItem("ronin_flash_pro");
         setCards([]);
         setCurrentIndex(0);
         setScore(0);
         setMode('upload');
+        setRawInput("");
       };
 
       if (mode === 'upload') return (
         <div className="max-w-xl mx-auto min-h-screen flex flex-col items-center justify-center p-6">
-          <h1 className="text-3xl font-bold mb-6 text-indigo-400">Flashcard Studio</h1>
-          <div className="w-full flex justify-between mb-4 px-2">
-             <span className="text-sm text-slate-500 font-medium uppercase tracking-widest">Bulk Content (.md)</span>
-             <button onClick={() => setIsShuffle(!isShuffle)} className={`text-xs font-bold px-3 py-1 rounded-full border transition ${isShuffle ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-slate-700 text-slate-500'}`}>
-                {isShuffle ? 'SHUFFLE ON' : 'SEQUENTIAL'}
+          <h1 className="text-3xl font-bold mb-2 text-indigo-400">Flashcard Studio</h1>
+          <p className="text-slate-500 text-sm mb-8">Upload .md file or paste content</p>
+          
+          <div 
+            onClick={() => fileInputRef.current.click()}
+            className="w-full drop-zone rounded-2xl p-8 mb-6 flex flex-col items-center justify-center cursor-pointer"
+          >
+            <i data-lucide="upload-cloud" className="w-10 h-10 text-indigo-400 mb-2"></i>
+            <p className="text-sm font-medium text-slate-300">Click to upload .md file</p>
+            <input type="file" ref={fileInputRef} className="hidden" accept=".md,.txt" onChange={handleFileUpload} />
+          </div>
+
+          <div className="w-full flex justify-between mb-2 px-2">
+             <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">Or Paste Content</span>
+             <button onClick={() => setIsShuffle(!isShuffle)} className={`text-[10px] font-bold px-3 py-1 rounded-full border transition ${isShuffle ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-slate-700 text-slate-500'}`}>
+                {isShuffle ? 'SHUFFLE: ON' : 'SEQUENTIAL'}
              </button>
           </div>
-          <textarea className="w-full h-80 p-5 bg-[#0d1424] border border-white/5 rounded-2xl text-sm font-mono mb-6 focus:border-indigo-500 outline-none" 
-            placeholder="Paste your 100 questions here...&#10;Q: Question [Easy] [Icon: Hindi]&#10;A: Answer"
+          <textarea className="w-full h-48 p-4 bg-[#0d1424] border border-white/5 rounded-2xl text-xs font-mono mb-6 focus:border-indigo-500 outline-none" 
+            placeholder="Q: Question [Easy] [Icon: Hindi]&#10;A: Answer"
             value={rawInput} onChange={e => setRawInput(e.target.value)} />
-          <button onClick={processDeck} className="w-full bg-indigo-600 py-4 rounded-2xl font-bold text-lg shadow-xl active:scale-95 transition">Start Learning</button>
+          
+          <button onClick={() => parseAndStart(rawInput)} className="w-full bg-indigo-600 py-4 rounded-2xl font-bold text-lg shadow-xl active:scale-95 transition">Start Learning</button>
         </div>
       );
 
@@ -142,12 +169,14 @@
 
       return (
         <div className="max-w-lg mx-auto min-h-screen flex flex-col p-6">
-          <header className="flex justify-between items-start mb-12 pt-6">
-            <div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total Score</p>
-              <p className="text-3xl font-bold text-indigo-400 tabular-nums">{score}</p>
+          <header className="flex justify-between items-center mb-12 pt-6">
+            <div className="flex gap-4">
+              <div className="px-4 py-2 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Score</p>
+                <p className="text-2xl font-bold text-indigo-400 tabular-nums">{score}</p>
+              </div>
             </div>
-            <button onClick={handleReset} className="p-2 btn-glass rounded-xl text-slate-500 hover:text-rose-400 transition">
+            <button onClick={handleReset} className="p-3 btn-glass rounded-xl text-slate-500 hover:text-rose-400 transition" title="Reset Session">
               <i data-lucide="rotate-ccw" className="w-5 h-5"></i>
             </button>
           </header>
@@ -157,7 +186,7 @@
               <div className={`card-inner ${flipped ? 'is-flipped' : ''}`}>
                 <div className={`card-face card-front border-t-8 ${borderColor}`}>
                   <div className="flex justify-between items-center mb-6">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">Question {currentIndex + 1}/{cards.length}</span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Card {currentIndex + 1}/{cards.length}</span>
                     <SubjectIcon subject={card.s} />
                   </div>
                   <div className="flex-1 flex items-center justify-center">
