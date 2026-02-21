@@ -1,14 +1,14 @@
 {
   "name": "Ronin Flashcard Studio",
   "short_name": "Flashcards",
-  "description": "Professional-grade multi-subject flashcard application.",
+  "description": "Multi-subject flashcard app with Math and Hindi support.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#080d1a",
   "theme_color": "#6366f1",
   "icons": [
     {
-      "src": "https://base44.com/logo_v2.svg",
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='32' fill='%236366f1'/%3E%3Crect x='32' y='48' width='128' height='96' rx='10' fill='white' opacity='.9'/%3E%3Cline x1='96' y1='48' x2='96' y2='144' stroke='%236366f1' stroke-width='6'/%3E%3C/svg%3E",
       "sizes": "192x192",
       "type": "image/svg+xml"
     }
