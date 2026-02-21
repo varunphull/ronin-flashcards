@@ -3,199 +3,575 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Ronin Flashcard Studio v2</title>
+  <title>Ronin Flashcard Studio</title>
 
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#080d1a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Devanagari:wght@400;700&display=swap" rel="stylesheet">
+  
+  <!-- KaTeX for Math -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
-
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
 
   <style>
-    :root { --bg: #080d1a; --indigo: #6366f1; }
-    body { font-family: 'Space Grotesk', sans-serif; background-color: var(--bg); color: #e2e8f0; -webkit-tap-highlight-color: transparent; }
-    .hindi-text { font-family: 'Noto Sans Devanagari', sans-serif; }
-    
-    .card-container { perspective: 1500px; height: 440px; width: 100%; max-width: 400px; margin: 0 auto; }
-    .card-inner { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; position: relative; height: 100%; width: 100%; cursor: pointer; }
+    :root {
+      --bg: #080d1a;
+      --card-bg: #111827;
+      --accent: #6366f1;
+      --glass: rgba(255,255,255,0.03);
+      --glass-border: rgba(255,255,255,0.1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background-color: var(--bg);
+      color: #e2e8f0;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 100vh;
+    }
+
+    /* ── Typography ── */
+    .hindi-text { font-family: 'Noto Sans Devanagari', sans-serif !important; font-size: 1.15em; }
+    .math-text  { font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Glow bg ── */
+    .glow-point {
+      position: fixed; width: 40vw; height: 40vw; border-radius: 50%;
+      background: radial-gradient(circle, rgba(99,102,241,.08) 0%, transparent 70%);
+      filter: blur(60px); z-index: 0; pointer-events: none;
+    }
+    #root { position: relative; z-index: 1; }
+
+    /* ── Card Flip Engine ── */
+    .card-container { perspective: 2000px; width: 100%; max-width: 420px; height: 480px; cursor: pointer; }
+    .card-inner {
+      position: relative; width: 100%; height: 100%;
+      transition: transform 0.75s cubic-bezier(0.34,1.56,0.64,1);
+      transform-style: preserve-3d;
+    }
     .is-flipped { transform: rotateY(180deg); }
-    .card-face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 24px; padding: 32px; display: flex; flex-direction: column; border: 1px solid rgba(255, 255, 255, 0.1); background: linear-gradient(145deg, #111827, #080d1a); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-    .card-back { transform: rotateY(180deg); background: #0f172a; border: 1px solid var(--indigo); }
-    
-    .btn-glass { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); }
-    .drop-zone { border: 2px dashed rgba(99, 102, 241, 0.3); }
+    .card-face {
+      position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+      border-radius: 28px; padding: 2rem;
+      display: flex; flex-direction: column;
+      border: 1px solid var(--glass-border);
+      background: linear-gradient(165deg, #111827 0%, #080d1a 100%);
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,.6);
+      overflow: hidden;
+    }
+    .card-back { transform: rotateY(180deg); background: linear-gradient(165deg, #0f172a 0%, #020617 100%); }
+
+    /* ── Buttons ── */
+    .btn-glass {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(12px);
+      transition: all 0.25s ease;
+      cursor: pointer;
+    }
+    .btn-glass:active { transform: scale(0.95); }
+
+    /* ── Score badge ── */
+    .score-badge {
+      background: linear-gradient(to bottom, rgba(99,102,241,.2), transparent);
+      border: 1px solid rgba(99,102,241,.25);
+    }
+
+    /* ── Toggle Switch ── */
+    .toggle-track {
+      width: 56px; height: 28px; border-radius: 14px;
+      background: #1e293b; border: 1px solid rgba(255,255,255,.1);
+      position: relative; cursor: pointer; transition: background 0.3s;
+      flex-shrink: 0;
+    }
+    .toggle-track.on { background: #6366f1; }
+    .toggle-thumb {
+      position: absolute; top: 3px; left: 3px;
+      width: 22px; height: 22px; border-radius: 11px;
+      background: #fff; transition: left 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      box-shadow: 0 1px 4px rgba(0,0,0,.4);
+    }
+    .toggle-track.on .toggle-thumb { left: 31px; }
+
+    /* ── Textarea override ── */
+    textarea {
+      resize: vertical;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #cbd5e1;
+    }
+    textarea::placeholder { color: #475569; }
+    textarea:focus { border-color: #6366f1 !important; outline: none; }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp 0.4s ease both; }
+
+    @keyframes pulse-soft {
+      0%,100% { opacity: .5; } 50% { opacity: 1; }
+    }
+    .pulse-soft { animation: pulse-soft 2s ease infinite; }
+
+    /* ── KaTeX overrides for dark bg ── */
+    .katex { color: #e2e8f0 !important; }
+    .katex-html { white-space: normal !important; }
+
+    /* ── Difficulty border colours ── */
+    .diff-easy     { border-top: 6px solid #10b981; }
+    .diff-medium   { border-top: 6px solid #f59e0b; }
+    .diff-difficult{ border-top: 6px solid #f43f5e; }
+
+    /* ── Reset button ── */
+    .reset-btn {
+      width: 38px; height: 38px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      color: #64748b; transition: all 0.2s;
+    }
+    .reset-btn:hover { color: #f43f5e; background: rgba(244,63,94,.1); }
+    .reset-btn svg { width: 18px; height: 18px; }
+
+    /* ── Markdown-style content ── */
+    .card-content { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+    .card-content p { text-align: center; font-size: 1.2rem; font-weight: 500; line-height: 1.6; }
+    .card-content .bullet-line { text-align: left; font-size: 1rem; }
+
+    /* ── Progress bar ── */
+    .progress-bar { height: 3px; background: #1e293b; border-radius: 2px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg,#6366f1,#818cf8); border-radius: 2px; transition: width 0.4s ease; }
   </style>
 </head>
 <body>
+  <div class="glow-point" style="top:-10%;left:-10%;"></div>
+  <div class="glow-point" style="bottom:-10%;right:-10%;"></div>
   <div id="root"></div>
 
-  <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+<script>
+// ═══════════════════════════════════════════════
+//  WAIT FOR KaTeX to be ready before rendering
+// ═══════════════════════════════════════════════
+window.katexReady = false;
+document.addEventListener('DOMContentLoaded', () => {
+  // KaTeX loads deferred — poll until available
+  const waitKatex = setInterval(() => {
+    if (typeof katex !== 'undefined') {
+      window.katexReady = true;
+      clearInterval(waitKatex);
+      initApp();
+    }
+  }, 50);
+});
 
-    const SubjectIcon = ({ subject }) => {
-      const s = (subject || "").toLowerCase();
-      const map = {
-        hindi: <span className="text-2xl font-bold hindi-text text-amber-500">अ</span>,
-        maths: <i data-lucide="calculator" className="w-6 h-6 text-indigo-400"></i>,
-        science: <i data-lucide="flask-conical" className="w-6 h-6 text-emerald-400"></i>,
-        english: <i data-lucide="languages" className="w-6 h-6 text-sky-400"></i>,
-        computer: <i data-lucide="cpu" className="w-6 h-6 text-cyan-400"></i>
-      };
-      return <div className="p-2 bg-white/5 rounded-xl border border-white/10">{map[s] || <span>📚</span>}</div>;
-    };
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+const S = {
+  view: 'upload',      // 'upload' | 'study' | 'summary'
+  cards: [],
+  index: 0,
+  score: 0,
+  isFlipped: false,
+  shuffle: false,
+  rawText: '',
+};
 
-    const MathText = ({ content }) => {
-      const ref = useRef(null);
-      useEffect(() => {
-        if (!ref.current) return;
-        const parts = content.split(/(\$[^$]+\$)/g);
-        ref.current.innerHTML = "";
-        parts.forEach(p => {
-          const span = document.createElement("span");
-          if (p.startsWith("$") && p.endsWith("$")) {
-            try { katex.render(p.slice(1, -1), span, { throwOnError: false }); } catch(e) { span.innerText = p; }
-          } else {
-            if (/[\u0900-\u097F]/.test(p)) span.className = "hindi-text";
-            span.innerText = p;
-          }
-          ref.current.appendChild(span);
-        });
-        lucide.createIcons();
-      }, [content]);
-      return <div ref={ref} className="text-xl font-medium text-center leading-relaxed"></div>;
-    };
+// ═══════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
-    function App() {
-      // Using a new storage key to force browser to ignore old caches
-      const STORAGE_KEY = "ronin_flashcards_v2_final";
-      
-      const [cards, setCards] = useState([]);
-      const [index, setIndex] = useState(0);
-      const [score, setScore] = useState(0);
-      const [mode, setMode] = useState('upload'); 
-      const [flipped, setFlipped] = useState(false);
-      const [isShuffle, setIsShuffle] = useState(false);
-      const [text, setText] = useState("");
+function parseDeck(raw) {
+  // Support both Q:/A: format AND plain line pairs AND markdown-style "**Q**" lines
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  const deck = [];
+  let i = 0;
+  while (i < lines.length) {
+    let qLine = lines[i];
+    // Skip comment/header lines starting with #
+    if (qLine.startsWith('#')) { i++; continue; }
 
-      useEffect(() => {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) { setCards(JSON.parse(saved)); setMode('study'); }
-        lucide.createIcons();
-      }, []);
+    // Try Q: / A: pair
+    if (/^Q:/i.test(qLine) && i + 1 < lines.length && /^A:/i.test(lines[i+1])) {
+      let q = qLine.replace(/^Q:\s*/i, '');
+      let a = lines[i+1].replace(/^A:\s*/i, '');
+      const diff = (q.match(/\[(Easy|Medium|Difficult)\]/i) || ['','Medium'])[1];
+      const subj = (q.match(/\[Icon:\s*(.*?)\]/i) || ['','science'])[1].toLowerCase();
+      q = q.replace(/\[.*?\]/g, '').trim();
+      deck.push({ q, a, d: diff, s: subj });
+      i += 2;
+      continue;
+    }
 
-      const startLearning = (input) => {
-        const lines = input.split("\n").map(l => l.trim()).filter(Boolean);
-        let deck = [];
-        for (let i = 0; i < lines.length; i += 2) {
-          if (!lines[i+1]) continue;
-          let q = lines[i].replace(/^Q:\s*/i, "");
-          let a = lines[i+1].replace(/^A:\s*/i, "");
-          const d = (q.match(/\[(Easy|Medium|Difficult)\]/i) || ["", "Medium"])[1];
-          const s = (q.match(/\[Icon:\s*(.*?)\]/i) || ["", "science"])[1];
-          deck.push({ q: q.replace(/\[.*?\]/g, "").trim(), a, d, s });
-        }
-        
-        if (isShuffle) deck = deck.sort(() => Math.random() - 0.5);
-        
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(deck));
-        setCards(deck);
-        setMode('study');
-      };
+    // Fallback: treat consecutive non-empty line pairs as Q/A
+    if (i + 1 < lines.length) {
+      deck.push({ q: qLine, a: lines[i+1], d: 'Medium', s: 'science' });
+      i += 2;
+      continue;
+    }
+    i++;
+  }
+  return deck;
+}
 
-      const fullReset = () => {
-        localStorage.removeItem(STORAGE_KEY);
-        window.location.reload(); // Force browser refresh to clear memory
-      };
+// ═══════════════════════════════════════════════
+//  CONTENT RENDERER — handles KaTeX + Hindi + plain
+// ═══════════════════════════════════════════════
+function renderContent(text, container) {
+  container.innerHTML = '';
+  if (!text) return;
 
-      if (mode === 'upload') return (
-        <div className="max-w-xl mx-auto min-h-screen flex flex-col items-center justify-center p-6">
-          <div className="w-12 h-12 bg-indigo-600 rounded-xl mb-4 flex items-center justify-center shadow-lg"><i data-lucide="zap"></i></div>
-          <h1 className="text-3xl font-bold mb-8">Flashcard Studio</h1>
+  // Split on LaTeX delimiters: $...$ or $$...$$
+  const parts = text.split(/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/g);
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'card-content';
+
+  const p = document.createElement('p');
+
+  parts.forEach(part => {
+    if (/^\$\$/.test(part) && window.katexReady) {
+      // Display math
+      const mathEl = document.createElement('span');
+      mathEl.style.display = 'block';
+      mathEl.style.textAlign = 'center';
+      mathEl.style.margin = '8px 0';
+      try {
+        katex.render(part.slice(2, -2).trim(), mathEl, { throwOnError: false, displayMode: true });
+      } catch(e) { mathEl.innerText = part; }
+      p.appendChild(mathEl);
+    } else if (/^\$/.test(part) && window.katexReady) {
+      // Inline math
+      const mathEl = document.createElement('span');
+      mathEl.className = 'math-text';
+      try {
+        katex.render(part.slice(1, -1).trim(), mathEl, { throwOnError: false, displayMode: false });
+      } catch(e) { mathEl.innerText = part; }
+      p.appendChild(mathEl);
+    } else {
+      // Check for Devanagari (Hindi)
+      const span = document.createElement('span');
+      if (/[\u0900-\u097F]/.test(part)) {
+        span.className = 'hindi-text';
+      }
+      span.innerText = part;
+      p.appendChild(span);
+    }
+  });
+
+  wrapper.appendChild(p);
+  container.appendChild(wrapper);
+}
+
+// ═══════════════════════════════════════════════
+//  SUBJECT ICONS (pure SVG — no Lucide dependency)
+// ═══════════════════════════════════════════════
+const SUBJECT_ICONS = {
+  hindi:    `<span style="font-family:'Noto Sans Devanagari',sans-serif;font-size:1.6rem;font-weight:700;color:#f59e0b;">अ</span>`,
+  maths:    `<svg viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="4" y1="6" x2="8" y2="6"/><line x1="4" y1="18" x2="8" y2="18"/></svg>`,
+  science:  `<svg viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12M6 3a2 2 0 0 0-2 2v1a4 4 0 0 0 .586 2.086L9 14v6h6v-6l4.414-5.914A4 4 0 0 0 20 6V5a2 2 0 0 0-2-2"/></svg>`,
+  english:  `<svg viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`,
+  computer: `<svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
+  default:  `<svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+};
+function subjectIcon(s) {
+  return SUBJECT_ICONS[s] || SUBJECT_ICONS.default;
+}
+
+// ═══════════════════════════════════════════════
+//  DIFF COLOR
+// ═══════════════════════════════════════════════
+function diffClass(d) {
+  if (!d) return 'diff-medium';
+  return { Easy: 'diff-easy', Medium: 'diff-medium', Difficult: 'diff-difficult' }[d] || 'diff-medium';
+}
+function diffLabel(d) {
+  const colors = { Easy: '#10b981', Medium: '#f59e0b', Difficult: '#f43f5e' };
+  return `<span style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${colors[d]||'#94a3b8'}">${d||'Medium'}</span>`;
+}
+
+// ═══════════════════════════════════════════════
+//  RENDER FUNCTIONS
+// ═══════════════════════════════════════════════
+function rerender() {
+  const root = document.getElementById('root');
+  if (S.view === 'upload') root.innerHTML = renderUpload();
+  else if (S.view === 'study') root.innerHTML = renderStudy();
+  else root.innerHTML = renderSummary();
+  attachEvents();
+}
+
+// ── UPLOAD SCREEN ──────────────────────────────
+function renderUpload() {
+  return `
+  <div class="fade-up" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem;max-width:680px;margin:0 auto;">
+    
+    <div style="margin-bottom:1.5rem;padding:1.25rem;border-radius:20px;background:#6366f1;box-shadow:0 20px 40px -8px rgba(99,102,241,.4);">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 4v16M2 12h20"/>
+      </svg>
+    </div>
+
+    <h1 style="font-size:2.25rem;font-weight:700;letter-spacing:-.03em;margin-bottom:.5rem;">Flashcard Studio</h1>
+    <p style="color:#64748b;font-weight:500;margin-bottom:2rem;text-align:center;">Paste your questions below — supports Q:/A: format, math ($LaTeX$) &amp; Hindi</p>
+
+    <textarea id="raw-input"
+      style="width:100%;height:320px;padding:1.25rem;background:#0d1424;border:1px solid rgba(255,255,255,.07);border-radius:20px;font-family:'JetBrains Mono',monospace;margin-bottom:1.25rem;color:#cbd5e1;"
+      placeholder="Q: What is the quadratic formula? [Difficult] [Icon: Maths]&#10;A: $x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$&#10;&#10;Q: राजधानी क्या है? [Easy] [Icon: Hindi]&#10;A: नई दिल्ली&#10;&#10;Q: Photosynthesis equation [Medium] [Icon: Science]&#10;A: $6CO_2 + 6H_2O \\rightarrow C_6H_{12}O_6 + 6O_2$"
+    >${S.rawText}</textarea>
+
+    <!-- Shuffle Toggle -->
+    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:1rem 1.25rem;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:16px;margin-bottom:1.25rem;">
+      <div>
+        <p style="font-weight:600;font-size:.9rem;">Card Order</p>
+        <p style="font-size:.75rem;color:#64748b;margin-top:2px;">${S.shuffle ? '🔀 Shuffled randomly each session' : '📋 Sequential — follows your file order'}</p>
+      </div>
+      <div id="shuffle-toggle" class="toggle-track ${S.shuffle ? 'on' : ''}">
+        <div class="toggle-thumb"></div>
+      </div>
+    </div>
+
+    <button id="generate-btn" style="width:100%;padding:1.1rem;background:linear-gradient(135deg,#6366f1,#818cf8);border:none;border-radius:16px;font-family:'Space Grotesk',sans-serif;font-size:1.05rem;font-weight:700;color:white;cursor:pointer;box-shadow:0 12px 30px -8px rgba(99,102,241,.5);transition:transform .2s,box-shadow .2s;">
+      Generate Deck →
+    </button>
+
+    <p id="parse-error" style="color:#f43f5e;margin-top:1rem;font-size:.85rem;display:none;">⚠️ No valid Q:/A: pairs found. Check your format.</p>
+  </div>`;
+}
+
+// ── STUDY SCREEN ───────────────────────────────
+function renderStudy() {
+  const card = S.cards[S.index];
+  const prog = ((S.index) / S.cards.length) * 100;
+
+  return `
+  <div class="fade-up" style="max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;padding:1.5rem;padding-top:2.5rem;">
+    
+    <!-- Header -->
+    <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+      <div class="score-badge" style="padding:.5rem 1rem;border-radius:12px;">
+        <p style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.1em;text-transform:uppercase;">Score</p>
+        <p style="font-size:1.75rem;font-weight:700;color:#818cf8;font-variant-numeric:tabular-nums;">${S.score}</p>
+      </div>
+      <div style="text-align:center;">
+        <p style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.1em;text-transform:uppercase;">Card</p>
+        <p style="font-size:1.1rem;font-weight:700;">${S.index + 1} <span style="color:#334155;">/ ${S.cards.length}</span></p>
+      </div>
+      <button id="reset-btn" class="reset-btn btn-glass" title="Reset — go back to upload">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Progress Bar -->
+    <div class="progress-bar" style="margin-bottom:2rem;">
+      <div class="progress-fill" style="width:${prog}%;"></div>
+    </div>
+
+    <!-- Card -->
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;">
+      <div class="card-container" id="card-container">
+        <div class="card-inner ${S.isFlipped ? 'is-flipped' : ''}">
           
-          <div className="w-full flex justify-between mb-4 px-2">
-             <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Bulk Paste Content</label>
-             <button onClick={() => setIsShuffle(!isShuffle)} className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-all ${isShuffle ? 'bg-indigo-600 border-indigo-500' : 'border-slate-700 text-slate-500'}`}>
-                {isShuffle ? 'SHUFFLE: ON' : 'SEQUENTIAL: ON'}
-             </button>
-          </div>
-
-          <textarea className="w-full h-64 p-5 bg-[#0d1424] border border-white/5 rounded-2xl text-xs font-mono mb-6 focus:border-indigo-500 outline-none transition-all" 
-            placeholder="Q: Question [Easy] [Icon: Hindi]&#10;A: Answer"
-            value={text} onChange={e => setText(e.target.value)} />
-
-          <div className="w-full flex gap-3">
-            <input type="file" id="fileIn" className="hidden" accept=".md,.txt" onChange={(e) => {
-              const reader = new FileReader();
-              reader.onload = (ev) => startLearning(ev.target.result);
-              reader.readAsText(e.target.files[0]);
-            }} />
-            <button onClick={() => document.getElementById('fileIn').click()} className="flex-1 py-4 btn-glass rounded-2xl font-bold text-sm">Upload .md</button>
-            <button onClick={() => startLearning(text)} className="flex-[2] py-4 bg-indigo-600 rounded-2xl font-bold text-sm shadow-xl">Start Session</button>
-          </div>
-        </div>
-      );
-
-      if (mode === 'finish') return (
-        <div className="flex flex-col items-center justify-center min-h-screen text-center p-6">
-          <h1 className="text-6xl font-bold mb-4">{score} <span className="text-2xl text-slate-500">Pts</span></h1>
-          <p className="text-slate-400 mb-12 uppercase text-xs tracking-widest">Deck Complete</p>
-          <button onClick={fullReset} className="px-10 py-4 bg-indigo-600 rounded-2xl font-bold">Restart Everything</button>
-        </div>
-      );
-
-      const card = cards[index];
-      const borderColor = { Easy: 'border-emerald-500', Medium: 'border-amber-500', Difficult: 'border-rose-500' }[card.d];
-
-      return (
-        <div className="max-w-lg mx-auto min-h-screen flex flex-col p-6">
-          <header className="flex justify-between items-center mb-12 pt-6">
-            <div className="bg-indigo-500/10 px-4 py-1.5 rounded-lg border border-indigo-500/20">
-              <span className="text-[10px] font-bold text-slate-500 uppercase mr-3">Score</span>
-              <span className="text-xl font-bold text-indigo-400">{score}</span>
-            </div>
-            <button onClick={fullReset} className="p-2 btn-glass rounded-xl text-rose-500" title="Emergency Reset">
-              <i data-lucide="rotate-ccw" className="w-5 h-5"></i>
-            </button>
-          </header>
-
-          <div className="flex-1 flex flex-col justify-center">
-            <div className="card-container" onClick={() => setFlipped(!flipped)}>
-              <div className={`card-inner ${flipped ? 'is-flipped' : ''}`}>
-                <div className={`card-face border-t-8 ${borderColor}`}>
-                  <div className="flex justify-between items-center mb-10">
-                    <span className="text-[10px] font-bold text-slate-600 uppercase">Card {index+1}/{cards.length}</span>
-                    <SubjectIcon subject={card.s} />
-                  </div>
-                  <MathText content={card.q} />
-                  <p className="text-center text-[9px] text-slate-600 font-bold uppercase tracking-widest mt-auto animate-pulse">Tap to reveal</p>
-                </div>
-                <div className="card-face card-back border-t-8 border-indigo-500">
-                  <div className="flex justify-between items-center mb-10">
-                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Answer</span>
-                    <SubjectIcon subject={card.s} />
-                  </div>
-                  <MathText content={card.a} />
-                </div>
+          <!-- Front -->
+          <div class="card-face ${diffClass(card.d)}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;">
+              <div>
+                <span style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#475569;background:rgba(255,255,255,.04);padding:.25rem .75rem;border-radius:999px;border:1px solid rgba(255,255,255,.06);">Question</span>
+                <div style="margin-top:.5rem;">${diffLabel(card.d)}</div>
+              </div>
+              <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                ${subjectIcon(card.s)}
               </div>
             </div>
-
-            <div className={`mt-10 flex gap-4 transition-all duration-300 ${flipped ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-              <button onClick={() => { setFlipped(false); setTimeout(() => index < cards.length - 1 ? setIndex(index + 1) : setMode('finish'), 250); }} className="flex-1 py-4 btn-glass text-slate-400 rounded-2xl font-bold">Incorrect</button>
-              <button onClick={() => { setScore(score+2); setFlipped(false); setTimeout(() => index < cards.length - 1 ? setIndex(index + 1) : setMode('finish'), 250); }} className="flex-1 py-4 bg-indigo-600 rounded-2xl font-bold shadow-lg shadow-indigo-500/20">Correct +2</button>
-            </div>
+            <div id="front-content" style="flex:1;display:flex;align-items:center;justify-content:center;"></div>
+            <p class="pulse-soft" style="text-align:center;font-size:10px;color:#334155;font-weight:700;letter-spacing:.25em;text-transform:uppercase;margin-top:auto;padding-top:1rem;">Tap to Reveal</p>
           </div>
+
+          <!-- Back -->
+          <div class="card-face card-back" style="border-top:6px solid #6366f1;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;">
+              <span style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6366f1;background:rgba(99,102,241,.1);padding:.25rem .75rem;border-radius:999px;border:1px solid rgba(99,102,241,.2);">Answer</span>
+              <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                ${subjectIcon(card.s)}
+              </div>
+            </div>
+            <div id="back-content" style="flex:1;display:flex;align-items:center;justify-content:center;"></div>
+          </div>
+
         </div>
-      );
-    }
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
+      </div>
+
+      <!-- Action Buttons (visible after flip) -->
+      <div style="display:flex;gap:.75rem;width:100%;opacity:${S.isFlipped ? 1 : 0};pointer-events:${S.isFlipped ? 'auto' : 'none'};transition:opacity .4s ease;">
+        <button id="incorrect-btn" style="flex:1;padding:1.1rem;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);border-radius:20px;color:#f43f5e;font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;transition:all .2s;">
+          ✗ Incorrect
+        </button>
+        <button id="correct-btn" style="flex:1;padding:1.1rem;background:linear-gradient(135deg,#6366f1,#818cf8);border:none;border-radius:20px;color:white;font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;box-shadow:0 8px 20px -6px rgba(99,102,241,.5);transition:all .2s;">
+          ✓ Correct +2
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── SUMMARY SCREEN ─────────────────────────────
+function renderSummary() {
+  const max = S.cards.length * 2;
+  const pct = Math.round((S.score / max) * 100);
+  const emoji = pct >= 80 ? '🏆' : pct >= 60 ? '🎯' : pct >= 40 ? '📚' : '💪';
+  const msg   = pct >= 80 ? 'Outstanding!' : pct >= 60 ? 'Great session!' : pct >= 40 ? 'Keep practising!' : "Don't give up!";
+
+  return `
+  <div class="fade-up" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:2rem;">
+    <div style="font-size:5rem;margin-bottom:1.5rem;">${emoji}</div>
+    <h1 style="font-size:3.5rem;font-weight:700;letter-spacing:-.04em;margin-bottom:.5rem;">${S.score} <span style="color:#334155;">/ ${max}</span></h1>
+    <p style="font-size:1.5rem;font-weight:600;color:#818cf8;margin-bottom:.5rem;">${pct}%</p>
+    <p style="color:#64748b;font-size:1.1rem;margin-bottom:3rem;">${msg}</p>
+
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;">
+      <button id="replay-btn" style="padding:1rem 2rem;background:linear-gradient(135deg,#6366f1,#818cf8);border:none;border-radius:16px;font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:700;color:white;cursor:pointer;box-shadow:0 12px 30px -8px rgba(99,102,241,.4);">
+        ↻ Play Again
+      </button>
+      <button id="new-deck-btn" class="btn-glass" style="padding:1rem 2rem;border-radius:16px;font-family:'Space Grotesk',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;color:#e2e8f0;">
+        + New Deck
+      </button>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════
+//  EVENT ATTACHMENT
+// ═══════════════════════════════════════════════
+function attachEvents() {
+  if (S.view === 'upload') {
+    document.getElementById('shuffle-toggle').addEventListener('click', () => {
+      S.shuffle = !S.shuffle;
+      rerender();
+    });
+
+    document.getElementById('raw-input').addEventListener('input', (e) => {
+      S.rawText = e.target.value;
+    });
+
+    document.getElementById('generate-btn').addEventListener('click', () => {
+      S.rawText = document.getElementById('raw-input').value;
+      const deck = parseDeck(S.rawText);
+      if (!deck.length) {
+        document.getElementById('parse-error').style.display = 'block';
+        return;
+      }
+      S.cards = S.shuffle ? shuffleArray(deck) : deck;
+      S.index = 0;
+      S.score = 0;
+      S.isFlipped = false;
+      S.view = 'study';
+      rerender();
+    });
+  }
+
+  if (S.view === 'study') {
+    // Render card content AFTER DOM is ready
+    const card = S.cards[S.index];
+    const frontEl = document.getElementById('front-content');
+    const backEl  = document.getElementById('back-content');
+    if (frontEl && card) renderContent(card.q, frontEl);
+    if (backEl  && card) renderContent(card.a, backEl);
+
+    document.getElementById('card-container').addEventListener('click', () => {
+      S.isFlipped = !S.isFlipped;
+      rerender();
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      S.view = 'upload';
+      S.cards = [];
+      S.index = 0;
+      S.score = 0;
+      S.isFlipped = false;
+      rerender();
+    });
+
+    document.getElementById('incorrect-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleNext(false);
+    });
+
+    document.getElementById('correct-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleNext(true);
+    });
+  }
+
+  if (S.view === 'summary') {
+    document.getElementById('replay-btn').addEventListener('click', () => {
+      // Replay same deck (re-shuffle if shuffle mode)
+      if (S.shuffle) {
+        const raw = parseDeck(S.rawText);
+        S.cards = shuffleArray(raw);
+      }
+      S.index = 0;
+      S.score = 0;
+      S.isFlipped = false;
+      S.view = 'study';
+      rerender();
+    });
+
+    document.getElementById('new-deck-btn').addEventListener('click', () => {
+      S.view = 'upload';
+      S.cards = [];
+      S.index = 0;
+      S.score = 0;
+      S.isFlipped = false;
+      rerender();
+    });
+  }
+}
+
+function handleNext(correct) {
+  if (correct) S.score += 2;
+  if (S.index < S.cards.length - 1) {
+    S.isFlipped = false;
+    S.index++;
+    rerender();
+  } else {
+    S.view = 'summary';
+    rerender();
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+function initApp() {
+  rerender();
+}
+</script>
+
+<!-- Service Worker -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+    });
+  }
+</script>
 </body>
 </html>
